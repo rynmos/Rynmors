@@ -2,1225 +2,508 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rynmos简易简谱制作工具</title>
+<title>Rynmos简易简谱制作器</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "Microsoft YaHei", sans-serif;
+        background: #fff;
+        color: #333;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .toolbar {
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .toolbar button, .toolbar select, .toolbar input {
+        padding: 6px 12px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #f9f9f9;
+    }
+    .toolbar button:hover { background: #e9e9e9; }
+    .staff-container {
+        width: 95%;
+        max-width: 900px;
+        margin-top: 10px;
+        border: none;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .staff-line {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 20px; /* 行间距 */
+        position: relative;
+    }
+    .line-number {
+        width: 30px;
+        text-align: right;
+        padding-right: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        flex-shrink: 0;
+        padding-top: 15px; /* 对齐小节行 */
+    }
+    .measures-row {
+        display: flex;
+        flex-grow: 1;
+        border-left: 1px solid #333;
+    }
+    .measure {
+        flex: 1;
+        border-right: 1px solid #333;
+        padding: 4px 2px;
+        min-height: 90px; /* 容纳3行 */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+    }
+    .measure-row-inner {
+        height: 30px; /* 每行固定高度 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+    }
+    .note-cell {
+        width: 24px;
+        height: 28px;
+        line-height: 28px;
+        text-align: center;
+        font-size: 20px;
+        cursor: pointer;
+        position: relative;
+        vertical-align: middle;
+        font-weight: bold;
+    }
+    .note-cell:hover { background: #f0f0f0; }
+    .dot-high, .dot-low {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 9px; /* 点的大小 */
+        line-height: 1;
+        color: #333;
+    }
+    .dot-high { top: -2px; } /* 高音点位置 */
+    .dot-low { bottom: -2px; } /* 低音点位置 */
+    
+    /* 超高音两点竖排样式 */
+    .dot-upper {
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 6px; /* 控制两点间距 */
+        font-size: 9px;
+        color: #333;
+    }
 
-  body {
-    font-family: "WenQuanYi Micro Hei", "Microsoft YaHei", sans-serif;
-    background: #fff;
-    color: #222;
-    min-height: 100vh;
-  }
+    .number-pad-overlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.3);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    .number-pad {
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 15px;
+        display: grid;
+        grid-template-columns: repeat(4, 50px);
+        gap: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .number-pad button {
+        height: 45px;
+        font-size: 18px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #fafafa;
+        cursor: pointer;
+    }
+    .number-pad button:hover { background: #eaeaea; }
+    .np-empty { grid-column: span 2; }
+    .np-delete { background: #ffebee !important; color: #c62828; }
 
-  /* 顶部工具栏 */
-  .toolbar {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: #fff;
-    border-bottom: 1px solid #e0e0e0;
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .toolbar .title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-right: 16px;
-    letter-spacing: 2px;
-  }
-
-  .toolbar .sep {
-    width: 1px;
-    height: 24px;
-    background: #ddd;
-    margin: 0 4px;
-  }
-
-  .toolbar label {
-    font-size: 13px;
-    color: #666;
-  }
-
-  .toolbar button, .toolbar select {
-    padding: 6px 14px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fafafa;
-    cursor: pointer;
-    font-size: 14px;
-    color: #333;
-    transition: all .15s;
-  }
-  .toolbar button:hover, .toolbar select:hover {
-    background: #f0f0f0;
-    border-color: #bbb;
-  }
-
-  /* 歌名信息 */
-  .song-info {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 20px 20px 0;
-  }
-  .song-info input {
-    border: none;
-    border-bottom: 1px solid #ddd;
-    font-size: 16px;
-    padding: 4px 0;
-    width: 100%;
-    outline: none;
-    color: #333;
-  }
-  .song-info input:focus { border-bottom-color: #999; }
-  .song-info .info-row {
-    display: flex;
-    gap: 20px;
-    margin-top: 8px;
-  }
-  .song-info .info-row input {
-    flex: 1;
-    font-size: 13px;
-    color: #666;
-  }
-
-  /* 编辑区域 */
-  .editor-wrap {
-    max-width: 960px;
-    margin: 20px auto;
-    padding: 0 20px;
-  }
-
-  /* 一行 = 4 个小节 */
-  .staff-line {
-    display: flex;
-    align-items: stretch;
-    margin-bottom: 16px;
-    padding: 4px 0;
-    position: relative;
-  }
-
-  .staff-line .line-number {
-    display: flex;
-    align-items: center;
-    padding: 0 8px 0 0;
-    font-size: 13px;
-    color: #999;
-    user-select: none;
-    min-width: 28px;
-    justify-content: flex-end;
-  }
-
-  .staff-line .measures-row {
-    display: flex;
-    flex: 1;
-    align-items: stretch;
-    gap: 0;
-  }
-
-  /* 单个小节 - 无边框 */
-  .measure {
-    flex: 1;
-    border-left: 2px solid #333;
-    padding: 2px 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-height: 60px;
-    position: relative;
-  }
-  .measure:last-child {
-    border-right: 2px solid #333;
-  }
-
-  /* 小节内的行 */
-  .measure-row-inner {
-    display: flex;
-    align-items: center;
-    min-height: 52px;
-    gap: 2px;
-    flex-wrap: wrap;
-  }
-
-  /* 音符格子 */
-  .note-cell {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-width: 26px;
-    height: 50px;
-    padding: 0 1px;
-    cursor: pointer;
-    position: relative;
-    user-select: none;
-    border-radius: 3px;
-    transition: background .1s;
-  }
-  .note-cell:hover { background: #e8eeff; }
-  .note-cell.selected { background: #d0d8f0; border-radius: 3px; }
-
-  .note-cell .dots-above {
-    height: 12px;
-    line-height: 10px;
-    font-size: 18px;
-    color: #333;
-    visibility: hidden;
-    font-weight: bold;
-  }
-  .note-cell .dots-above.show { visibility: visible; }
-
-  .note-cell .note-char {
-    font-size: 22px;
-    font-weight: 500;
-    line-height: 1.1;
-    color: #111;
-    min-width: 12px;
-    text-align: center;
-    padding: 0 1px;
-  }
-  .note-cell .note-char.empty {
-    color: transparent;
-    min-width: 12px;
-  }
-
-  .note-cell .dots-below {
-    height: 12px;
-    line-height: 10px;
-    font-size: 18px;
-    color: #333;
-    visibility: hidden;
-    font-weight: bold;
-  }
-  .note-cell .dots-below.show { visibility: visible; }
-
-  /* 小节内添加音符按钮 */
-  .add-note-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 22px;
-    height: 30px;
-    border: 1px dashed #ccc;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 16px;
-    color: #bbb;
-    margin: 2px 1px;
-    transition: all .15s;
-    vertical-align: middle;
-  }
-  .add-note-btn:hover {
-    border-color: #999;
-    color: #666;
-    background: #f0f0f0;
-  }
-
-  /* 小节操作按钮 */
-  .measure-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 0 4px;
-    justify-content: center;
-    min-width: 28px;
-  }
-  .measure-actions button {
-    width: 24px;
-    height: 24px;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 14px;
-    color: #888;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all .15s;
-    padding: 0;
-  }
-  .measure-actions button:hover {
-    background: #f0f0f0;
-    border-color: #bbb;
-    color: #333;
-  }
-
-  /* 行操作按钮 */
-  .staff-line-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 0 4px;
-    justify-content: center;
-    min-width: 28px;
-  }
-  .staff-line-actions button {
-    width: 24px;
-    height: 24px;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 14px;
-    color: #888;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all .15s;
-    padding: 0;
-  }
-  .staff-line-actions button:hover {
-    background: #fee;
-    border-color: #f88;
-    color: #e44;
-  }
-
-  /* 数字键盘浮层 */
-  .num-pad-overlay {
-    display: none;
-    position: fixed;
-    z-index: 200;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,.12);
-    padding: 12px;
-  }
-  .num-pad-overlay.show { display: block; }
-
-  .num-pad-overlay .pad-title {
-    font-size: 13px;
-    color: #666;
-    margin-bottom: 8px;
-    text-align: center;
-  }
-
-  .num-pad-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 44px);
-    gap: 4px;
-  }
-
-  .num-pad-grid button {
-    width: 44px;
-    height: 38px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #fafafa;
-    font-size: 18px;
-    cursor: pointer;
-    transition: all .1s;
-  }
-  .num-pad-grid button:hover {
-    background: #e8eeff;
-    border-color: #99aaff;
-  }
-  .num-pad-grid button.empty-btn {
-    color: #ccc;
-    font-size: 14px;
-  }
-
-  .num-pad-actions {
-    display: flex;
-    gap: 6px;
-    margin-top: 8px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .num-pad-actions button {
-    padding: 5px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #fafafa;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all .1s;
-  }
-  .num-pad-actions button:hover { background: #f0f0f0; }
-  .num-pad-actions button.active {
-    background: #333;
-    color: #fff;
-    border-color: #333;
-  }
-
-  /* 控制面板 */
-  .controls {
-    max-width: 960px;
-    margin: 16px auto;
-    padding: 0 20px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .controls button {
-    padding: 8px 18px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all .15s;
-  }
-  .controls button:hover {
-    background: #f5f5f5;
-    border-color: #bbb;
-  }
-  .controls button.primary {
-    background: #333;
-    color: #fff;
-    border-color: #333;
-  }
-  .controls button.primary:hover { background: #555; }
-
-  /* 导出区域 */
-  .export-area {
-    max-width: 960px;
-    margin: 20px auto 40px;
-    padding: 0 20px;
-  }
-  .export-area h3 {
-    font-size: 15px;
-    margin-bottom: 8px;
-    color: #444;
-  }
-  .export-area textarea {
-    width: 100%;
-    height: 100px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 12px;
-    font-size: 14px;
-    font-family: "Courier New", monospace;
-    resize: vertical;
-    background: #fafafa;
-  }
-
-  /* 提示信息 */
-  .toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: #333;
-    color: #fff;
-    padding: 10px 24px;
-    border-radius: 6px;
-    font-size: 14px;
-    opacity: 0;
-    transition: all .3s;
-    pointer-events: none;
-    z-index: 999;
-  }
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  /* 右键菜单 */
-  .ctx-menu {
-    display: none;
-    position: fixed;
-    z-index: 300;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    box-shadow: 0 2px 12px rgba(0,0,0,.1);
-    padding: 4px 0;
-    min-width: 140px;
-  }
-  .ctx-menu.show { display: block; }
-  .ctx-menu div {
-    padding: 6px 16px;
-    font-size: 13px;
-    cursor: pointer;
-    color: #333;
-  }
-  .ctx-menu div:hover { background: #f0f0f0; }
-
-  /* 说明文字 */
-  .help-text {
-    max-width: 960px;
-    margin: 10px auto 0;
-    padding: 0 20px;
-    font-size: 12px;
-    color: #999;
-    line-height: 1.8;
-  }
+    .history-modal {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.4);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+    }
+    .history-content {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    .history-item {
+        border-bottom: 1px solid #eee;
+        padding: 10px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .history-info span { display: block; font-size: 12px; color: #666; }
+    .history-actions button { margin-left: 5px; padding: 4px 8px; }
 </style>
 </head>
 <body>
 
-<!-- 顶部工具栏 -->
 <div class="toolbar">
-  <span class="title">简谱制作工具</span>
-  <div class="sep"></div>
-  <label>调号：</label>
-  <select id="keySelect">
-    <option value="1=C">1=C</option>
-    <option value="1=D">1=D</option>
-    <option value="1=E">1=E</option>
-    <option value="1=F">1=F</option>
-    <option value="1=G">1=G</option>
-    <option value="1=A">1=A</option>
-    <option value="1=B">1=B</option>
-  </select>
-  <label>拍号：</label>
-  <select id="timeSelect">
-    <option value="4/4">4/4</option>
-    <option value="3/4">3/4</option>
-    <option value="2/4">2/4</option>
-    <option value="6/8">6/8</option>
-  </select>
-  <div class="sep"></div>
-  <button id="btnAddStaff">＋ 添加一行（4小节）</button>
-  <div class="sep"></div>
-  <button id="btnUndo">撤销</button>
-  <button id="btnRedo">重做</button>
+    <input id="songTitle" placeholder="歌名">
+    <input id="songAuthor" placeholder="作词/作曲">
+    <select id="keySelect"></select>
+    <select id="beatSelect"></select>
+    <button onclick="addStaffLine()">添加小节行</button>
+    <button onclick="saveToHistory()">💾 保存</button>
+    <button onclick="showHistory()">📋 历史记录</button>
+    <button onclick="exportAsImage()">导出图片</button>
 </div>
 
-<!-- 歌曲信息 -->
-<div class="song-info">
-  <input id="songTitle" type="text" placeholder="歌曲名称" />
-  <div class="info-row">
-    <input id="songArtist" type="text" placeholder="作词 / 作曲" />
-  </div>
+<div id="staffContainer" class="staff-container"></div>
+
+<!-- 数字键盘 -->
+<div id="numberPadOverlay" class="number-pad-overlay">
+    <div class="number-pad">
+        <button data-num="1">1</button><button data-num="2">2</button>
+        <button data-num="3">3</button><button data-num="4">4</button>
+        <button data-num="5">5</button><button data-num="6">6</button>
+        <button data-num="7">7</button><button data-num="0">空</button>
+        <button onclick="setPitch('high2')">超高</button>
+        <button onclick="setPitch('high')">高音</button>
+        <button onclick="setPitch('mid')">中音</button>
+        <button onclick="setPitch('low')">低音</button>
+        <button class="np-empty" onclick="closePad()">取消</button>
+        <button class="np-delete" onclick="deleteNote()">删除</button>
+    </div>
 </div>
 
-<!-- 编辑区域 -->
-<div class="editor-wrap" id="editorWrap"></div>
-
-<!-- 控制按钮 -->
-<div class="controls">
-  <button class="primary" id="btnExportImg">导出为图片</button>
-  <button id="btnCopy">复制简谱文本</button>
-  <button id="btnClear">清空</button>
+<!-- 历史记录弹窗 -->
+<div id="historyModal" class="history-modal">
+    <div class="history-content">
+        <h3>历史记录</h3>
+        <div id="historyList"></div>
+        <button onclick="closeHistory()" style="margin-top:15px;">关闭</button>
+    </div>
 </div>
-
-<!-- 导出文本区 -->
-<div class="export-area">
-  <h3>导出文本（可用作参考，推荐导出图片）</h3>
-  <textarea id="exportText" readonly placeholder="点击"导出简谱文本"后内容将显示在这里..."></textarea>
-</div>
-
-<!-- 说明 -->
-<div class="help-text">
-  💡 使用说明：点击音符数字可修改；点击空白格子可添加新音符；在数字键盘面板选择高音/低音/中音；<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· 高音：数字上方显示点 ·&nbsp;&nbsp;· 低音：数字下方显示点&nbsp;&nbsp;· 中音：无点<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· 每行固定 4 个小节，每个小节的行数可自由增减（1~3行），适应多声部<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· 空拍显示为空白；导出推荐用「导出为图片」，效果最佳
-</div>
-
-<!-- 数字键盘浮层 -->
-<div class="num-pad-overlay" id="numPad">
-  <div class="pad-title">选择音符</div>
-  <div class="num-pad-grid" id="numPadGrid"></div>
-  <div class="num-pad-actions">
-    <button id="padHigh">高音</button>
-    <button id="padLow">低音</button>
-    <button id="padMid">中音</button>
-    <button id="padEmpty">设为空白</button>
-    <button id="padDelete">删除</button>
-  </div>
-</div>
-
-<!-- 右键菜单 -->
-<div class="ctx-menu" id="ctxMenu">
-  <div data-action="delete">删除此音符</div>
-  <div data-action="insert_before">在前方插入</div>
-  <div data-action="insert_after">在后方插入</div>
-  <div data-action="add_row_above">小节内上方加行</div>
-  <div data-action="add_row_below">小节内下方加行</div>
-  <div data-action="remove_row">删除此行</div>
-</div>
-
-<!-- 提示 -->
-<div class="toast" id="toast"></div>
 
 <script>
-// ====== 状态 ======
-const state = {
-  staffs: [],
-  history: [],
-  historyIdx: -1,
-  selected: null,
-};
+let currentCell = null;
+let historyData = JSON.parse(localStorage.getItem('jianpu_history')) || [];
+const MAX_HISTORY = 50;
 
-const MEASURES_PER_LINE = 4;
+// 初始化调号和拍号
+for(let i=1;i<=7;i++) document.getElementById('keySelect').innerHTML += `<option>1=${['C','D','E','F','G','A','B'][i-1]}</option>`;
+['4/4','3/4','2/4','6/8'].forEach(b => document.getElementById('beatSelect').innerHTML += `<option>${b}</option>`);
 
-// ====== 初始化 ======
-function initState() {
-  state.staffs = [createStaffLine()];
-  state.selected = { staff: 0, measure: 0, row: 0, col: 0 };
-  saveHistory();
-}
-
-function createStaffLine() {
-  const measures = [];
-  for (let i = 0; i < MEASURES_PER_LINE; i++) {
-    measures.push({ rows: [ { notes: [] } ] });
-  }
-  return measures;
-}
-
-// ====== 渲染 ======
-function render() {
-  const wrap = document.getElementById('editorWrap');
-  wrap.innerHTML = '';
-
-  state.staffs.forEach((measures, si) => {
-    const lineEl = document.createElement('div');
-    lineEl.className = 'staff-line';
-
-    // 行号
-    const lineNum = document.createElement('div');
-    lineNum.className = 'line-number';
-    lineNum.textContent = si + 1;
-    lineEl.appendChild(lineNum);
-
-    // 小节容器
-    const measuresRow = document.createElement('div');
-    measuresRow.className = 'measures-row';
-
-    measures.forEach((measure, mi) => {
-      const measureEl = document.createElement('div');
-      measureEl.className = 'measure';
-
-      // 渲染每行的音符（无行标签）
-      measure.rows.forEach((row, ri) => {
-        const rowEl = document.createElement('div');
-        rowEl.className = 'measure-row-inner';
-
-        row.notes.forEach((note, ni) => {
-          const cell = createNoteCell(note, si, mi, ri, ni);
-          rowEl.appendChild(cell);
-        });
-
-        // 该行末尾的添加按钮
-        const addBtn = document.createElement('div');
-        addBtn.className = 'add-note-btn';
-        addBtn.textContent = '+';
-        addBtn.title = '添加音符';
-        addBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          state.selected = { staff: si, measure: mi, row: ri, col: row.notes.length };
-          render();
-          showNumPad(e.clientX, e.clientY, si, mi, ri, row.notes.length);
-        });
-        rowEl.appendChild(addBtn);
-
-        measureEl.appendChild(rowEl);
-      });
-
-      // 小节操作按钮（右侧）
-      const actions = document.createElement('div');
-      actions.className = 'measure-actions';
-
-      if (measure.rows.length < 3) {
-        const addRowBtn = document.createElement('button');
-        addRowBtn.title = '添加一行';
-        addRowBtn.textContent = '+';
-        addRowBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          measure.rows.push({ notes: [] });
-          saveHistory();
-          render();
-        });
-        actions.appendChild(addRowBtn);
-      }
-
-      if (measure.rows.length > 1) {
-        const delRowBtn = document.createElement('button');
-        delRowBtn.title = '删除最下行';
-        delRowBtn.textContent = '−';
-        delRowBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          measure.rows.pop();
-          saveHistory();
-          render();
-        });
-        actions.appendChild(delRowBtn);
-      }
-
-      measureEl.appendChild(actions);
-      measuresRow.appendChild(measureEl);
-    });
-
-    // 行级操作
-    const lineActions = document.createElement('div');
-    lineActions.className = 'staff-line-actions';
-
-    if (state.staffs.length > 1) {
-      const delLineBtn = document.createElement('button');
-      delLineBtn.title = '删除此行';
-      delLineBtn.textContent = '×';
-      delLineBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.staffs.splice(si, 1);
-        state.selected = null;
-        saveHistory();
-        render();
-      });
-      lineActions.appendChild(delLineBtn);
+function createMeasure(rows=1) {
+    const measure = document.createElement('div');
+    measure.className = 'measure';
+    for(let r=0; r<rows; r++) {
+        const row = document.createElement('div');
+        row.className = 'measure-row-inner';
+        for(let c=0; c<4; c++) { // 固定4个音符位
+            const cell = document.createElement('span');
+            cell.className = 'note-cell';
+            cell.dataset.note = '';
+            cell.dataset.pitch = 'mid';
+            cell.textContent = '';
+            cell.onclick = () => openPad(cell);
+            cell.oncontextmenu = (e) => { e.preventDefault(); showContextMenu(e, cell); };
+            row.appendChild(cell);
+        }
+        measure.appendChild(row);
     }
-
-    lineEl.appendChild(measuresRow);
-    lineEl.appendChild(lineActions);
-    wrap.appendChild(lineEl);
-  });
+    return measure;
 }
 
-function createNoteCell(note, si, mi, ri, ni) {
-  const cell = document.createElement('div');
-  cell.className = 'note-cell';
+function addStaffLine() {
+    const container = document.getElementById('staffContainer');
+    const lineNum = container.children.length + 1;
+    const line = document.createElement('div');
+    line.className = 'staff-line';
+    line.innerHTML = `<div class="line-number">${lineNum}</div><div class="measures-row"></div>`;
+    const measuresRow = line.querySelector('.measures-row');
+    for(let i=0; i<4; i++) measuresRow.appendChild(createMeasure(1)); // 一行4小节
+    container.appendChild(line);
+}
 
-  const isEmpty = (note.value === 0 || note.value === null || note.value === undefined);
+function openPad(cell) {
+    currentCell = cell;
+    document.getElementById('numberPadOverlay').style.display = 'flex';
+}
 
-  if (state.selected &&
-      state.selected.staff === si &&
-      state.selected.measure === mi &&
-      state.selected.row === ri &&
-      state.selected.col === ni) {
-    cell.classList.add('selected');
-  }
+function closePad() {
+    document.getElementById('numberPadOverlay').style.display = 'none';
+}
 
-  // 高音点
-  const above = document.createElement('div');
-  above.className = 'dots-above' + (note.pitch === 'high' ? ' show' : '');
-  above.textContent = '•';
-  cell.appendChild(above);
+document.querySelectorAll('.number-pad button[data-num]').forEach(btn => {
+    btn.onclick = () => {
+        if (!currentCell) return;
+        const num = btn.dataset.num;
+        currentCell.dataset.note = num;
+        renderCell(currentCell);
+        closePad();
+    };
+});
 
-  // 数字
-  const char = document.createElement('div');
-  char.className = 'note-char' + (isEmpty ? ' empty' : '');
-  char.textContent = isEmpty ? ' ' : note.value;
-  cell.appendChild(char);
+function setPitch(pitch) {
+    if (!currentCell) return;
+    currentCell.dataset.pitch = pitch;
+    renderCell(currentCell);
+}
 
-  // 低音点
-  const below = document.createElement('div');
-  below.className = 'dots-below' + (note.pitch === 'low' ? ' show' : '');
-  below.textContent = '•';
-  cell.appendChild(below);
+function deleteNote() {
+    if (!currentCell) return;
+    currentCell.dataset.note = '';
+    currentCell.dataset.pitch = 'mid';
+    renderCell(currentCell);
+    closePad();
+}
 
-  // 点击
-  cell.addEventListener('click', (e) => {
-    e.stopPropagation();
-    state.selected = { staff: si, measure: mi, row: ri, col: ni };
-    render();
-    showNumPad(e.clientX, e.clientY, si, mi, ri, ni);
-  });
+function renderCell(cell) {
+    const note = cell.dataset.note;
+    const pitch = cell.dataset.pitch;
+    let dotsHTML = '';
+    
+    if (pitch === 'high2') {
+        dotsHTML = '<span class="dot-upper"><span>·</span><span>·</span></span>';
+    } else if (pitch === 'high') {
+        dotsHTML = '<span class="dot-high">·</span>';
+    } else if (pitch === 'low') {
+        dotsHTML = '<span class="dot-low">·</span>';
+    }
+    
+    cell.innerHTML = dotsHTML + (note === '0' ? '' : note);
+}
 
-  // 右键
-  cell.addEventListener('contextmenu', (e) => {
+function showContextMenu(e, cell) {
     e.preventDefault();
-    state.selected = { staff: si, measure: mi, row: ri, col: ni };
-    showCtxMenu(e.clientX, e.clientY, si, mi, ri, ni);
-  });
+    const existing = document.getElementById('ctxMenu');
+    if(existing) existing.remove();
 
-  return cell;
+    const menu = document.createElement('div');
+    menu.id = 'ctxMenu';
+    menu.style.cssText = `position:fixed; top:${e.clientY}px; left:${e.clientX}px; background:#fff; border:1px solid #ccc; z-index:2000;`;
+    const actions = [
+        {t:'前方插入行', f:()=>insertRow(cell, 'before')},
+        {t:'后方插入行', f:()=>insertRow(cell, 'after')},
+        {t:'删除此行', f:()=>deleteRow(cell)},
+        {t:'设为空白', f:()=>{cell.dataset.note=''; renderCell(cell);}}
+    ];
+    actions.forEach(a => {
+        const d = document.createElement('div');
+        d.textContent = a.t;
+        d.style.cssText = 'padding:5px 10px; cursor:pointer;';
+        d.onmouseover = ()=>d.style.background='#eee';
+        d.onmouseout = ()=>d.style.background='#fff';
+        d.onclick = ()=>{a.f(); menu.remove();};
+        menu.appendChild(d);
+    });
+    document.body.appendChild(menu);
+    document.addEventListener('click', () => menu.remove(), {once:true});
 }
 
-// ====== 数字键盘 ======
-function buildNumPad() {
-  const grid = document.getElementById('numPadGrid');
-  for (let i = 1; i <= 7; i++) {
-    const btn = document.createElement('button');
-    btn.textContent = i;
-    btn.addEventListener('click', () => placeNote(i, state._padPitch || 'mid'));
-    grid.appendChild(btn);
-  }
-  const emptyBtn = document.createElement('button');
-  emptyBtn.textContent = '空';
-  emptyBtn.className = 'empty-btn';
-  emptyBtn.addEventListener('click', () => placeNote(0, state._padPitch || 'mid'));
-  grid.appendChild(emptyBtn);
-}
-
-function showNumPad(x, y, si, mi, ri, ni) {
-  const pad = document.getElementById('numPad');
-  pad.style.left = Math.min(x, window.innerWidth - 380) + 'px';
-  pad.style.top = Math.min(y + 10, window.innerHeight - 220) + 'px';
-  pad.classList.add('show');
-  state._padStaff = si;
-  state._padMeasure = mi;
-  state._padRow = ri;
-  state._padCol = ni;
-  updatePadPitchUI();
-}
-
-function hideNumPad() {
-  document.getElementById('numPad').classList.remove('show');
-}
-
-function updatePadPitchUI() {
-  const pitch = state._padPitch || 'mid';
-  document.getElementById('padHigh').className = pitch === 'high' ? 'active' : '';
-  document.getElementById('padLow').className = pitch === 'low' ? 'active' : '';
-  document.getElementById('padMid').className = pitch === 'mid' ? 'active' : '';
-}
-
-function placeNote(value, pitch) {
-  const si = state._padStaff, mi = state._padMeasure;
-  const ri = state._padRow, ci = state._padCol;
-  if (si === undefined) return;
-  const measure = state.staffs[si] && state.staffs[si][mi];
-  if (!measure) return;
-  const row = measure.rows[ri];
-  if (!row) return;
-
-  if (ci >= 0 && ci <= row.notes.length) {
-    row.notes[ci] = { value, pitch };
-    saveHistory();
-    render();
-  }
-}
-
-document.getElementById('padHigh').addEventListener('click', () => {
-  state._padPitch = 'high';
-  updatePadPitchUI();
-  applyPitchToSelected('high');
-});
-document.getElementById('padLow').addEventListener('click', () => {
-  state._padPitch = 'low';
-  updatePadPitchUI();
-  applyPitchToSelected('low');
-});
-document.getElementById('padMid').addEventListener('click', () => {
-  state._padPitch = 'mid';
-  updatePadPitchUI();
-  applyPitchToSelected('mid');
-});
-document.getElementById('padEmpty').addEventListener('click', () => {
-  placeNote(0, state._padPitch || 'mid');
-});
-document.getElementById('padDelete').addEventListener('click', () => {
-  const si = state._padStaff, mi = state._padMeasure;
-  const ri = state._padRow, ci = state._padCol;
-  if (si === undefined) return;
-  deleteNote(si, mi, ri, ci);
-  hideNumPad();
-});
-
-function applyPitchToSelected(pitch) {
-  const si = state._padStaff, mi = state._padMeasure;
-  const ri = state._padRow, ci = state._padCol;
-  if (si === undefined) return;
-  const measure = state.staffs[si] && state.staffs[si][mi];
-  if (!measure) return;
-  const row = measure.rows[ri];
-  if (!row || !row.notes[ci]) return;
-  row.notes[ci].pitch = pitch;
-  saveHistory();
-  render();
-}
-
-// ====== 右键菜单 ======
-const ctxMenu = document.getElementById('ctxMenu');
-function showCtxMenu(x, y, si, mi, ri, ni) {
-  ctxMenu.style.left = x + 'px';
-  ctxMenu.style.top = y + 'px';
-  ctxMenu.classList.add('show');
-  state._ctxStaff = si;
-  state._ctxMeasure = mi;
-  state._ctxRow = ri;
-  state._ctxCol = ni;
-}
-function hideCtxMenu() { ctxMenu.classList.remove('show'); }
-
-ctxMenu.addEventListener('click', (e) => {
-  const action = e.target.dataset.action;
-  const si = state._ctxStaff, mi = state._ctxMeasure;
-  const ri = state._ctxRow, ci = state._ctxCol;
-  const measure = state.staffs[si] && state.staffs[si][mi];
-  if (!measure) { hideCtxMenu(); return; }
-
-  if (action === 'delete') {
-    deleteNote(si, mi, ri, ci);
-  } else if (action === 'insert_before') {
-    measure.rows[ri].notes.splice(ci, 0, { value: 0, pitch: 'mid' });
-    state.selected = { staff: si, measure: mi, row: ri, col: ci };
-    saveHistory();
-    render();
-  } else if (action === 'insert_after') {
-    measure.rows[ri].notes.splice(ci + 1, 0, { value: 0, pitch: 'mid' });
-    state.selected = { staff: si, measure: mi, row: ri, col: ci + 1 };
-    saveHistory();
-    render();
-  } else if (action === 'add_row_above') {
-    measure.rows.splice(ri, 0, { notes: [] });
-    saveHistory();
-    render();
-  } else if (action === 'add_row_below') {
-    if (measure.rows.length < 3) {
-      measure.rows.splice(ri + 1, 0, { notes: [] });
-      saveHistory();
-      render();
+function insertRow(cell, pos) {
+    const measure = cell.closest('.measure');
+    const rows = measure.querySelectorAll('.measure-row-inner');
+    const idx = Array.from(rows).indexOf(cell.parentElement);
+    const newRow = document.createElement('div');
+    newRow.className = 'measure-row-inner';
+    for(let i=0;i<4;i++) {
+        const c = document.createElement('span');
+        c.className = 'note-cell';
+        c.dataset.note = '';
+        c.dataset.pitch = 'mid';
+        c.onclick = () => openPad(c);
+        c.oncontextmenu = (e) => {e.preventDefault(); showContextMenu(e,c);};
+        newRow.appendChild(c);
     }
-  } else if (action === 'remove_row') {
-    if (measure.rows.length > 1) {
-      measure.rows.splice(ri, 1);
-      saveHistory();
-      render();
-    }
-  }
-  hideCtxMenu();
-});
-
-document.addEventListener('click', () => { hideCtxMenu(); hideNumPad(); });
-
-// ====== 删除音符 ======
-function deleteNote(si, mi, ri, ci) {
-  const measure = state.staffs[si] && state.staffs[si][mi];
-  if (!measure) return;
-  const row = measure.rows[ri];
-  if (!row) return;
-
-  if (row.notes.length <= 1) {
-    row.notes[0] = { value: 0, pitch: 'mid' };
-  } else {
-    row.notes.splice(ci, 1);
-  }
-  state.selected = { staff: si, measure: mi, row: ri, col: ci };
-  saveHistory();
-  render();
+    if(pos==='before') measure.insertBefore(newRow, rows[idx]);
+    else measure.insertBefore(newRow, rows[idx].nextSibling);
 }
 
-// ====== 键盘导航 ======
-document.addEventListener('keydown', (e) => {
-  if (state.selected) {
-    const { staff, measure, row, col } = state.selected;
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      navigate(staff, measure, row, col + 1);
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      navigate(staff, measure, row, col - 1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      navigate(staff, measure, row + 1, col);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      navigate(staff, measure, row - 1, col);
-    } else if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault();
-      deleteNote(staff, measure, row, col);
-    }
-  }
-  if (document.getElementById('numPad').classList.contains('show')) {
-    const k = e.key;
-    if (k >= '1' && k <= '7') {
-      placeNote(parseInt(k), state._padPitch || 'mid');
-      return;
-    }
-    if (k === 'Escape') { hideNumPad(); return; }
-  }
-});
-
-function navigate(si, mi, ri, ci) {
-  if (si < 0 || si >= state.staffs.length) return;
-  const measure = state.staffs[si] && state.staffs[si][mi];
-  if (!measure) {
-    if (mi < state.staffs[si].length - 1) {
-      navigate(si, mi + 1, ri, 0);
-    }
-    return;
-  }
-  const row = measure.rows[ri];
-  if (!row) {
-    if (ri < measure.rows.length) {
-      navigate(si, mi, 0, ci);
-    }
-    return;
-  }
-  if (ci < 0 || ci >= row.notes.length) {
-    if (ci < 0 && mi > 0) {
-      const prevMeasure = state.staffs[si][mi - 1];
-      const prevRow = prevMeasure.rows[ri] || prevMeasure.rows[0];
-      navigate(si, mi - 1, ri, prevRow.notes.length - 1);
-    } else if (ci >= row.notes.length && mi < state.staffs[si].length - 1) {
-      navigate(si, mi + 1, ri, 0);
-    }
-    return;
-  }
-  state.selected = { staff: si, measure: mi, row: ri, col: ci };
-  render();
+function deleteRow(cell) {
+    const measure = cell.closest('.measure');
+    const rows = measure.querySelectorAll('.measure-row-inner');
+    if(rows.length <= 1) return alert('至少保留一行');
+    cell.parentElement.remove();
 }
 
-// ====== 添加行 ======
-document.getElementById('btnAddStaff').addEventListener('click', () => {
-  state.staffs.push(createStaffLine());
-  saveHistory();
-  render();
-});
+// --- 历史记录 ---
+function saveToHistory() {
+    const data = {
+        title: document.getElementById('songTitle').value,
+        author: document.getElementById('songAuthor').value,
+        key: document.getElementById('keySelect').value,
+        beat: document.getElementById('beatSelect').value,
+        staff: document.getElementById('staffContainer').innerHTML,
+        time: new Date().toLocaleString()
+    };
+    historyData.unshift(data);
+    if(historyData.length > MAX_HISTORY) historyData.pop();
+    localStorage.setItem('jianpu_history', JSON.stringify(historyData));
+    alert('已保存到本地历史记录！');
+}
 
-// ====== 导出为图片 ======
-document.getElementById('btnExportImg').addEventListener('click', () => {
-  exportAsImage();
-});
+function showHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    if(historyData.length === 0) { list.innerHTML = '<p>暂无记录</p>'; }
+    historyData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+            <div class="history-info">
+                <strong>${item.title||'未命名'}</strong>
+                <span>${item.author||''} | ${item.key} | ${item.time}</span>
+            </div>
+            <div class="history-actions">
+                <button onclick="loadHistory(${index})">导入编辑</button>
+                <button onclick="deleteHistory(${index})">删除</button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+    document.getElementById('historyModal').style.display = 'flex';
+}
 
+function loadHistory(index) {
+    const item = historyData[index];
+    document.getElementById('songTitle').value = item.title;
+    document.getElementById('songAuthor').value = item.author;
+    document.getElementById('keySelect').value = item.key;
+    document.getElementById('beatSelect').value = item.beat;
+    document.getElementById('staffContainer').innerHTML = item.staff;
+    // 重新绑定事件
+    document.querySelectorAll('.note-cell').forEach(cell => {
+        cell.onclick = () => openPad(cell);
+        cell.oncontextmenu = (e) => { e.preventDefault(); showContextMenu(e, cell); };
+        renderCell(cell);
+    });
+    closeHistory();
+}
+
+function deleteHistory(index) {
+    historyData.splice(index, 1);
+    localStorage.setItem('jianpu_history', JSON.stringify(historyData));
+    showHistory();
+}
+
+function closeHistory() {
+    document.getElementById('historyModal').style.display = 'none';
+}
+
+// --- 导出图片 ---
 function exportAsImage() {
-  const title = document.getElementById('songTitle').value.trim();
-  const artist = document.getElementById('songArtist').value.trim();
-  const key = document.getElementById('keySelect').value;
-  const time = document.getElementById('timeSelect').value;
+    const container = document.getElementById('staffContainer');
+    const scale = 2; // 清晰度倍数
+    const tempCanvas = document.createElement('canvas');
+    const ctx = tempCanvas.getContext('2d');
+    
+    // 计算尺寸
+    const lines = container.querySelectorAll('.staff-line');
+    let totalHeight = 40; // 预留顶部空间
+    const lineHeight = 110; // 每行高度（含行距）
+    const lineWidth = 860;
+    
+    tempCanvas.width = lineWidth * scale;
+    tempCanvas.height = (lines.length * lineHeight + 60) * scale;
+    
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, tempCanvas.width/scale, tempCanvas.height/scale);
+    ctx.font = 'bold 20px Microsoft YaHei';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#333';
 
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+    lines.forEach((line, lIdx) => {
+        const yBase = 40 + lIdx * lineHeight;
+        
+        // 行号
+        ctx.textAlign = 'right';
+        ctx.fillText(lIdx + 1, 25, yBase + 45);
+        ctx.textAlign = 'center';
 
-  // ===== 布局参数 =====
-  const canvasWidth = 1000;
-  const lineGap = 18;           // 行之间的空隙
-  const FONT_SIZE = 26;         // 数字字号（大一点更清晰）
-  const DOT_RADIUS = 2.2;      // 点的半径（适中）
-  const MEASURE_V_PADDING = 12; // 小节上下内边距
-
-  // 核心思路：每个"列位置"在不同行之间错开 x 偏移，避免点重叠
-  // 每个音符占用的水平空间 = 数字宽度 + 左右 padding 给点用
-  // 我们用固定列宽，所有行的同一列共享 x，但通过增大行高来确保垂直方向不重叠
-
-  // 垂直布局参数（像素）：
-  const ABOVE_DIGIT = 16;   // 高音点到数字基线的距离
-  const BELOW_DIGIT = 14;   // 低音点到数字基线的距离
-  // 单行内容的高度 = ABOVE_DIGIT + 数字高度 + BELOW_DIGIT
-  // 数字高度约等于 FONT_SIZE * 0.75
-  const SINGLE_ROW_CONTENT = ABOVE_DIGIT + FONT_SIZE * 0.75 + BELOW_DIGIT; // ~49px
-  const ROW_SPACING = 6;    // 行与行之间的额外间距
-  const MAX_ROWS = 3;
-
-  // 一小节内容高度 = 上边距 + rows*(行内容+行间距) - 最后一行无行间距 + 下边距
-  const singleMeasureContentH = MEASURE_V_PADDING * 2 + MAX_ROWS * SINGLE_ROW_CONTENT + (MAX_ROWS - 1) * ROW_SPACING;
-  // ~12*2 + 3*49 + 2*6 = 24 + 147 + 12 = 183px
-
-  const headerHeight = 80;
-  const footerHeight = 20;
-
-  const totalHeight = headerHeight + state.staffs.length * (singleMeasureContentH + lineGap) + footerHeight;
-  canvas.width = canvasWidth;
-  canvas.height = totalHeight;
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // ===== 标题区 =====
-  let y = 30;
-  ctx.fillStyle = '#222';
-  ctx.font = 'bold 22px "WenQuanYi Micro Hei"';
-  ctx.textAlign = 'center';
-  ctx.fillText(title || '歌曲名称', canvasWidth / 2, y);
-
-  y += 28;
-  ctx.font = '14px "WenQuanYi Micro Hei"';
-  ctx.fillStyle = '#666';
-  ctx.fillText(artist || '', canvasWidth / 2, y);
-
-  y += 20;
-  ctx.font = '14px "WenQuanYi Micro Hei"';
-  ctx.fillStyle = '#444';
-  ctx.fillText(key + '    ' + time, canvasWidth / 2, y);
-
-  y += 24;
-
-  // ===== 绘制每行简谱 =====
-  state.staffs.forEach((measures, si) => {
-    const lineTop = y + si * (singleMeasureContentH + lineGap);
-
-    // 行首序号
-    ctx.font = '13px "WenQuanYi Micro Hei"';
-    ctx.fillStyle = '#999';
-    ctx.textAlign = 'right';
-    ctx.fillText(si + 1 + '', 36, lineTop + singleMeasureContentH / 2 + 4);
-
-    const measureAreaLeft = 50;
-    const measureWidth = (canvasWidth - measureAreaLeft - 30) / MEASURES_PER_LINE;
-
-    // 计算该行所有小节中最大的 notes 数量
-    let maxNotesInLine = 0;
-    measures.forEach((measure) => {
-      measure.rows.forEach((row) => {
-        maxNotesInLine = Math.max(maxNotesInLine, row.notes.length);
-      });
-    });
-
-    // 音符间距（列宽）
-    const colWidth = Math.floor((measureWidth - 24) / Math.max(maxNotesInLine, 1));
-
-    measures.forEach((measure, mi) => {
-      const mx = measureAreaLeft + mi * measureWidth;
-
-      // 小节竖线
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(mx, lineTop + 4);
-      ctx.lineTo(mx, lineTop + singleMeasureContentH - 4);
-      ctx.stroke();
-
-      const rowCount = measure.rows.length;
-
-      measure.rows.forEach((row, ri) => {
-        // 该行的基准 y
-        const rowTop = lineTop + MEASURE_V_PADDING + ri * (SINGLE_ROW_CONTENT + ROW_SPACING);
-        const startX = mx + 12;
-
-        row.notes.forEach((note, ni) => {
-          const nx = startX + ni * colWidth;
-          const isEmpty = (note.value === 0 || note.value === null || note.value === undefined);
-
-          if (isEmpty) return;
-
-          // 数字基线：行的中间偏下一点
-          const digitBaseline = rowTop + ABOVE_DIGIT + FONT_SIZE * 0.55;
-
-          // 数字
-          ctx.font = FONT_SIZE + 'px "WenQuanYi Micro Hei"';
-          ctx.fillStyle = '#111';
-          ctx.textAlign = 'center';
-          ctx.fillText(note.value + '', nx, digitBaseline);
-
-          // 高音点（在 ABOVE_DIGIT 偏移处）
-          if (note.pitch === 'high') {
-            ctx.fillStyle = '#444';
+        const measures = line.querySelectorAll('.measure');
+        const measureWidth = lineWidth / 4;
+        
+        measures.forEach((measure, mIdx) => {
+            const xStart = 35 + mIdx * measureWidth;
+            const rows = measure.querySelectorAll('.measure-row-inner');
+            
+            // 绘制小节竖线
             ctx.beginPath();
-            ctx.arc(nx, rowTop + ABOVE_DIGIT * 0.45, DOT_RADIUS, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          // 低音点
-          if (note.pitch === 'low') {
-            ctx.fillStyle = '#444';
-            ctx.beginPath();
-            ctx.arc(nx, rowTop + ABOVE_DIGIT + FONT_SIZE * 0.75 + BELOW_DIGIT * 0.45, DOT_RADIUS, 0, Math.PI * 2);
-            ctx.fill();
-          }
+            ctx.moveTo(xStart, yBase);
+            ctx.lineTo(xStart, yBase + 90);
+            ctx.stroke();
+            
+            rows.forEach((row, rIdx) => {
+                const cells = row.querySelectorAll('.note-cell');
+                const rowY = yBase + 15 + rIdx * 30; // 行内垂直位置
+                
+                cells.forEach((cell, cIdx) => {
+                    const note = cell.dataset.note;
+                    const pitch = cell.dataset.pitch;
+                    const x = xStart + 10 + cIdx * ((measureWidth - 10) / 4);
+                    
+                    if(note && note !== '0') {
+                        // 绘制点（超高音竖排两点）
+                        if(pitch === 'high2') {
+                            ctx.beginPath(); ctx.arc(x, rowY - 10, 2, 0, Math.PI*2); ctx.fill(); // 上点
+                            ctx.beginPath(); ctx.arc(x, rowY - 4, 2, 0, Math.PI*2); ctx.fill(); // 下点
+                        } else if(pitch === 'high') {
+                            ctx.beginPath(); ctx.arc(x, rowY - 10, 2, 0, Math.PI*2); ctx.fill();
+                        } else if(pitch === 'low') {
+                            ctx.beginPath(); ctx.arc(x, rowY + 12, 2, 0, Math.PI*2); ctx.fill();
+                        }
+                        // 绘制数字
+                        ctx.fillText(note, x, rowY + 2);
+                    }
+                });
+            });
         });
-      });
+        // 最后一个小节右边竖线
+        ctx.beginPath();
+        ctx.moveTo(35 + 4 * measureWidth, yBase);
+        ctx.lineTo(35 + 4 * measureWidth, yBase + 90);
+        ctx.stroke();
     });
 
-    // 最后一个小节右边竖线
-    const lastMx = measureAreaLeft + MEASURES_PER_LINE * measureWidth;
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(lastMx, lineTop + 4);
-    ctx.lineTo(lastMx, lineTop + singleMeasureContentH - 4);
-    ctx.stroke();
-  });
-
-  // 下载
-  canvas.toBlob((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (title || '简谱') + '.png';
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('已导出为图片');
-  });
+    const link = document.createElement('a');
+    link.download = `简谱_${(document.getElementById('songTitle').value||'未命名')}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
 }
 
-// ====== 导出文本 ======
-document.getElementById('btnCopy').addEventListener('click', () => {
-  const title = document.getElementById('songTitle').value.trim();
-  const artist = document.getElementById('songArtist').value.trim();
-  const key = document.getElementById('keySelect').value;
-  const time = document.getElementById('timeSelect').value;
-
-  let text = '';
-  if (title) text += title + '\n';
-  if (artist) text += artist + '\n';
-  text += key + '  ' + time + '\n';
-  text += '─────────────────────────\n';
-
-  state.staffs.forEach((measures, si) => {
-    text += (si + 1) + '  |';
-
-    let maxNotes = 0;
-    measures.forEach(m => {
-      m.rows.forEach(r => {
-        maxNotes = Math.max(maxNotes, r.notes.length);
-      });
-    });
-
-    for (let ni = 0; ni < maxNotes; ni++) {
-      if (ni > 0) text += '  |';
-      measures.forEach((measure, mi) => {
-        measure.rows.forEach((row, ri) => {
-          if (ri > 0) text += ' | ';
-          const note = row.notes[ni];
-          if (!note) {
-            text += '  ';
-          } else {
-            const isEmpty = (note.value === 0 || note.value === null || note.value === undefined);
-            if (isEmpty) {
-              text += '  ';
-            } else if (note.pitch === 'high') {
-              text += '\u02D9' + note.value + ' ';
-            } else if (note.pitch === 'low') {
-              text += note.value + '\u02D9 ';
-            } else {
-              text += note.value + ' ';
-            }
-          }
-        });
-      });
-    }
-    text += '|\n';
-  });
-
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('已复制到剪贴板');
-  });
-});
-
-// ====== 清空 ======
-document.getElementById('btnClear').addEventListener('click', () => {
-  if (!confirm('确定要清空所有内容吗？')) return;
-  initState();
-  render();
-  document.getElementById('exportText').value = '';
-});
-
-// ====== 撤销/重做 ======
-function saveHistory() {
-  const snap = JSON.stringify(state.staffs);
-  if (state.historyIdx < state.history.length - 1) {
-    state.history = state.history.slice(0, state.historyIdx + 1);
-  }
-  state.history.push(snap);
-  state.historyIdx = state.history.length - 1;
-}
-
-document.getElementById('btnUndo').addEventListener('click', () => {
-  if (state.historyIdx > 0) {
-    state.historyIdx--;
-    state.staffs = JSON.parse(state.history[state.historyIdx]);
-    render();
-  }
-});
-document.getElementById('btnRedo').addEventListener('click', () => {
-  if (state.historyIdx < state.history.length - 1) {
-    state.historyIdx++;
-    state.staffs = JSON.parse(state.history[state.historyIdx]);
-    render();
-  }
-});
-
-// ====== Toast ======
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-// ====== 启动 ======
-buildNumPad();
-initState();
-render();
+// 初始化第一行
+addStaffLine();
 </script>
 </body>
 </html>
